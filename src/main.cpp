@@ -167,7 +167,7 @@ void parse_args(int argc, char **argv, float *&data, int procs, int procId, size
   } else if (input == false) {
     allocData(data, procs, procId, dataSize, localSize);
     if (distribution == NORMAL) {
-      uniform(data, localSize, 0.f, parameter, procId);
+      uniform(data, localSize, 1.f, parameter, procId);
     } else if (distribution == EXPONENTIAL) {
       exponential(data, localSize, parameter, procId);
     } else if (distribution == BAD1) {
@@ -216,6 +216,7 @@ void checkSort(float *sortedData, int procs, int procId, size_t dataSize, size_t
   float *bucketStart;
   float *bucketEnd;
   size_t bucketSize;
+  printf("%c[%d;%d;%dm",0x1B,0,31,40);
   if (procId == ROOT) {
     bucketStart = (float *)malloc(sizeof(float) * procs);
     bucketEnd = (float *)malloc(sizeof(float) * procs);
@@ -239,7 +240,10 @@ void checkSort(float *sortedData, int procs, int procId, size_t dataSize, size_t
         exit(EXIT_SUCCESS);
       }
     }
+    printf("%c[%d;%d;%dm",0x1B,0,35,40);
     printf("Result validation for %d numbers passed!\n", dataSize);
+    printf("%c[%d;%d;%dm",0x1B,0,37,40);
   }
+    printf("%c[%d;%d;%dm",0x1B,0,37,40);
 }
 

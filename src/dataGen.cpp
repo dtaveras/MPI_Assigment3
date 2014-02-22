@@ -4,7 +4,7 @@
 
 using namespace std;
 
-#define SEED 0
+#define SEED 1
 
 #define GET_DATA(data, size, dist, gen) \
   for (size_t i=0; i<size; i++) data[i] = distribution(generator);
@@ -14,8 +14,9 @@ extern int procId;
 void uniform(float *data, size_t size, float min, float max, int procId) {
   default_random_engine generator(SEED+procId);
   uniform_real_distribution<float> distribution(min, max);
-
-  GET_DATA(data, size, distribution, generator)
+  
+  GET_DATA(data, size, distribution, generator);
+  //printf("procId:%d: [%f, %f, %f, %f]\n",procId, data[0],data[1],data[2],data[3]);
 }
 
 void exponential(float *data, size_t size, float lambda, int procId) {
