@@ -39,7 +39,7 @@ all : parallelSort
 
 # Final Test Size 10 Million, test with multple of processor count
 run : parallelSort
-	$(MPIRUN) -np 4 parallelSort.exec -s 20 -d norm -p 5
+	$(MPIRUN) -np 4 parallelSort.exec -s 900 -d norm -p 5
 
 parallelSort: $(OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o parallelSort.exec

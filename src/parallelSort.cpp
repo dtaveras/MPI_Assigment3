@@ -59,6 +59,11 @@ void randomSample(float *data, size_t dataSize, float *sample, size_t sampleSize
     sample[i] = data[rand()%dataSize];
   }
 }
+void randomSample2(float *data, size_t dataSize, float *sample, size_t sampleSize) {
+  for (size_t i=0; i<sampleSize; i++) {
+    sample[i] = data[rand()%dataSize];
+  }
+}
 
   // Implement parallel sort algorithm as described in assignment 3
   // handout. 
@@ -83,15 +88,16 @@ void parallelSort(float *data, float *&sortedData, int procs,
   size_t sampSize = dataSize/2;
   size_t locSampleSize = sampSize/procs; // Local Sample Size
 
-#ifdef DBG_1
+  //#ifdef DBG_1
   textcolor(RED);
   if(procId == 0){
     printf("Sample Size: %d\n", sampSize);
   }
   textcolor(GREEN);
-  printf("ProcId:%d, local Sample Size:%d\n",procId, locSampleSize);
+  printf("LOCAL SIZE: %d\n",localSize);
+  printf("ProcId:%d, local Sample Size: %d\n",procId, locSampleSize);
   textcolor(WHITE);
-#endif
+  //#endif
 
   float* Samples;
   if(procId == 0)
@@ -114,7 +120,7 @@ void parallelSort(float *data, float *&sortedData, int procs,
   if(procId == ROOT){
 #ifdef DBG_1
     textcolor(YELLOW);
-    printArr("Samples: ", Samples, locSampleSize*procs, procId);
+    printArr("Samples: ", randLocSamples, locSampleSize, procId);
     textcolor(WHITE);
 #endif
 
@@ -122,13 +128,14 @@ void parallelSort(float *data, float *&sortedData, int procs,
     sort(Samples, Samples + locSampleSize*procs);
 
     pivots = (float*)malloc(sizeof(float)*(procs-1));
-    pivots[0] = Samples[0];
+    pivots[0] = Samples[1];
     for(int i=1; i < procs - 1; i++){
       pivots[i] = Samples[(sampSize/procs)*i];
     }
-#ifdef DBG_1
+    //#ifdef DBG_1
+    //printArr("Data: ", data, localSize, procId);
     printArr("Pivots:", pivots, procs-1, procId);
-#endif    
+    //#endif    
 
     //Send the pivots to all the other processes
     for(int i=1; i < procs; i++){
