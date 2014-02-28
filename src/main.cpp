@@ -61,6 +61,7 @@ int main(int argc, char **argv) {
   double serialTime = serialSort(data, procs, procId, dataSize, localSize);
   double mergeTime = mergeSort(data, procs, procId, dataSize, localSize);
 
+
   double startTime = MPI_Wtime();
 
   sortedData = NULL;
@@ -167,7 +168,7 @@ void parse_args(int argc, char **argv, float *&data, int procs, int procId, size
   } else if (input == false) {
     allocData(data, procs, procId, dataSize, localSize);
     if (distribution == NORMAL) {
-      uniform(data, localSize, 1.f, parameter, procId);
+      uniform(data, localSize, 0.0f, parameter, procId);
     } else if (distribution == EXPONENTIAL) {
       exponential(data, localSize, parameter, procId);
     } else if (distribution == BAD1) {
@@ -198,6 +199,7 @@ inline void allocData(float *&data, int procs, int procId, size_t &dataSize, siz
 }
 
 void checkSort(float *sortedData, int procs, int procId, size_t dataSize, size_t localSize) {
+
   if (!localSize) {
     printf("@@@ Skipping check results for processor %d because of zero localSize!\n", procId);
     return;

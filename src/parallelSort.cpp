@@ -22,8 +22,11 @@
 #define SAMP_THRESHOLD 100
 #define MIN_WORKLOAD 4 
 #define ROOT 0
-#define MAX_NAME_SIZE 256;
+#define MAX_NAME_SIZE 256
 
+#define LOG_10(X) (log(X))/(log(10))
+
+#define DBG_3
 //#define DBG_1
 //#define DBG_2
 
@@ -59,12 +62,6 @@ void randomSample(float *data, size_t dataSize, float *sample, size_t sampleSize
     sample[i] = data[rand()%dataSize];
   }
 }
-void randomSample2(float *data, size_t dataSize, float *sample, size_t sampleSize) {
-  for (size_t i=0; i<sampleSize; i++) {
-    sample[i] = data[rand()%dataSize];
-  }
-}
-
   // Implement parallel sort algorithm as described in assignment 3
   // handout. 
   // Input:
@@ -84,20 +81,28 @@ void randomSample2(float *data, size_t dataSize, float *sample, size_t sampleSiz
 void parallelSort(float *data, float *&sortedData, int procs, 
 		  int procId, size_t dataSize, size_t &localSize) {
 
-  if(localSize == 0 || dataSize == 0) return;
-  size_t sampSize = dataSize/2;
-  size_t locSampleSize = sampSize/procs; // Local Sample Size
-
-  //#ifdef DBG_1
-  textcolor(RED);
-  if(procId == 0){
-    printf("Sample Size: %d\n", sampSize);
+  if(localSize == 0) return;
+  //size_t sampSize = dataSize/2;
+  //size_t locSampleSize = sampSize/procs; // Local Sample Size
+  size_t locSampleSize = (size_t)float(12*LOG_10(dataSize));
+  if(locSampleSize >= localSize){
+    printf("locSampleSize >= localSize:true\n");
+    locSampleSize = (2*LOG_10(localSize))*(localSize/50 + 1) + 1;
   }
-  textcolor(GREEN);
-  printf("LOCAL SIZE: %d\n",localSize);
-  printf("ProcId:%d, local Sample Size: %d\n",procId, locSampleSize);
-  textcolor(WHITE);
-  //#endif
+  size_t sampSize = locSampleSize*procs;
+
+#ifdef DBG_3
+  if(procId == 0){
+    textcolor(RED);
+    printf("---------------------------------------\n");
+    printf("DataSize: %d    ",dataSize);
+    printf("Original Local Size: %d\n", localSize);
+    printf("Sample Size: %d     ", sampSize);
+    printf("Local Sample Size: %d\n", locSampleSize);
+    printf("---------------------------------------\n");
+    textcolor(WHITE);
+  }
+#endif
 
   float* Samples;
   if(procId == 0)
@@ -132,10 +137,12 @@ void parallelSort(float *data, float *&sortedData, int procs,
     for(int i=1; i < procs - 1; i++){
       pivots[i] = Samples[(sampSize/procs)*i];
     }
-    //#ifdef DBG_1
+
+#ifdef DBG_3
     //printArr("Data: ", data, localSize, procId);
+    printf("Number of Pivots: %d ",procs-1);
     printArr("Pivots:", pivots, procs-1, procId);
-    //#endif    
+#endif    
 
     //Send the pivots to all the other processes
     for(int i=1; i < procs; i++){
@@ -167,10 +174,7 @@ void parallelSort(float *data, float *&sortedData, int procs,
   }
   
   //By Now everyone has a copy of the pivots
-  //Create Buckets to send out Consider using ALL to ALL
-  /*-1 Sort then get indices and send -2 allocate procs-1 num buffers and put 
-   the correct elements where they belong -3 Have one buffer fill then send and 
-   repeat*/
+  //-1 Sort then get indices and send 
   //First we need an all to all communication to indicate each other how many
   //elements each will be receiving
 
@@ -210,11 +214,12 @@ void parallelSort(float *data, float *&sortedData, int procs,
       pivIndex += 1;
     }
   }
-
   //last Pivot count and disp
   srcCount[pivIndex] = count;
   srcDispl[pivIndex] = displ;
 
+  //If we did not reach the end of the pivots set the remaining counts
+  //to 0 and the displacement to max displacement
   while(pivIndex != procs-1){
     pivIndex += 1;
     srcCount[pivIndex] = 0;
@@ -229,7 +234,6 @@ void parallelSort(float *data, float *&sortedData, int procs,
   printArr("Displ:",srcDispl, procs, procId);
   textcolor(WHITE);
 #endif
-
 
   //exchange counts with all to all
   int* destCount = (int*)malloc(sizeof(int)*procs);
@@ -249,6 +253,14 @@ void parallelSort(float *data, float *&sortedData, int procs,
   }
   
   localSize = destDispl[procs-1] + destCount[procs-1];
+
+#ifdef DBG_3
+  textcolor(RED+procId);
+  printf("ProcId:%d Final_Local_Size:%d Fraction:%.3f%\n", procId, localSize,
+	 float(localSize)/float(dataSize)*100.0f);
+  textcolor(WHITE);
+#endif
+
   sortedData = (float*)malloc(sizeof(float)*localSize);
   
   //Exchange bucket data
