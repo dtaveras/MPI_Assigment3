@@ -99,7 +99,7 @@ void parallelSort(float *data, float *&sortedData, int procs,
     printf("Original Local Size: %d\n", localSize);
     printf("Sample Size: %d     ", sampSize);
     printf("Local Sample Size: %d\n", locSampleSize);
-    printf("---------------------------------------\n");
+    printf("---------------------------------------\n\n");
     textcolor(WHITE);
   }
 #endif
@@ -113,6 +113,7 @@ void parallelSort(float *data, float *&sortedData, int procs,
 
 #ifdef DBG_1
   textcolor(CYAN);
+  printArr("Data: ", data, localSize, procId);
   printArr("RandomSample: ", randLocSamples, locSampleSize, procId);
   textcolor(WHITE);
 #endif
@@ -133,13 +134,12 @@ void parallelSort(float *data, float *&sortedData, int procs,
     sort(Samples, Samples + locSampleSize*procs);
 
     pivots = (float*)malloc(sizeof(float)*(procs-1));
-    pivots[0] = Samples[1];
-    for(int i=1; i < procs - 1; i++){
-      pivots[i] = Samples[(sampSize/procs)*i];
+    for(int i=0; i < procs - 1; i++){
+      pivots[i] = Samples[(sampSize/procs)*(i+1)];
     }
 
+    //sort(pivots, pivots + (procs-1));
 #ifdef DBG_3
-    //printArr("Data: ", data, localSize, procId);
     printf("Number of Pivots: %d ",procs-1);
     printArr("Pivots:", pivots, procs-1, procId);
 #endif    
@@ -148,26 +148,18 @@ void parallelSort(float *data, float *&sortedData, int procs,
     for(int i=1; i < procs; i++){
       MPI_Send(pivots, procs-1, MPI_FLOAT, i, i, MPI_COMM_WORLD);
     }
-
-#ifdef DBG_1
-    textcolor(YELLOW);
-    printArr("Samples Sorted: ", Samples, locSampleSize*procs, procId);
-    textcolor(WHITE);
-#endif
   }
   else{
-#ifdef DBG_1
-    textcolor(MAGENTA);
-    printf("ProcID:%d\n", procId);
-#endif
     MPI_Status stat;
-    //We know this size ahead of time so condsider making it static
+    //We know this size ahead of time so consider making it static
     pivots = (float*)malloc(sizeof(float)*(procs-1));
 
     //Note that in the future this could be made an Asynchronous Recieve
     MPI_Recv(pivots, procs-1, MPI_FLOAT, ROOT, procId, MPI_COMM_WORLD, &stat);
 
 #ifdef DBG_1
+    textcolor(MAGENTA);
+    printf("ProcID:%d\n", procId);
     printArr("Pivots:", pivots, procs-1, procId);
     textcolor(WHITE);
 #endif    
@@ -181,49 +173,29 @@ void parallelSort(float *data, float *&sortedData, int procs,
   //NLOG(N) sorting time
   sort(data, data + localSize);
   //calculate a send count
-  int* srcCount = (int*)malloc(sizeof(int)*procs);
-  int* srcDispl = (int*)malloc(sizeof(int)*procs);
-
-  srcDispl[0] = 0;
-  int pivIndex = 0, displ = 0, count = 0; 
+  int* srcCount = (int*)calloc(procs,sizeof(int));
+  int* srcDispl = (int*)calloc(procs,sizeof(int));
+  
+  //Use lower_bound to make this part cleaner
+  int bucketId;
   for(int i=0; i < localSize; i++){
-    if(pivIndex == 0){
-      if(data[i] < pivots[pivIndex])
-	count += 1;
-      else{
-	srcDispl[pivIndex] = displ;
-	srcCount[pivIndex] = count;
-	displ += count;
-	count = 0;
-	i -= 1; //repeat loop with new pivIndex
-	pivIndex += 1;
-      }
+    if(data[i] < pivots[0]){
+      //printf("[procID:%d buckedId:%d data:%f]\n",procId, 0, data[i]);
+      srcCount[0]+=1;
     }
-    else if(pivIndex == procs-1){
-      if(data[i] >= pivots[pivIndex])
-	count += 1;
-    }
-    else if(pivots[pivIndex-1] <= data[i] && data[i] < pivots[pivIndex])
-      count += 1;
     else{
-      srcDispl[pivIndex] = displ;
-      srcCount[pivIndex] = count;
-      displ += count;
-      count = 0;
-      i -= 1; //repeat loop with new pivIndex
-      pivIndex += 1;
+      bucketId = upper_bound(pivots, pivots + procs-1, data[i]) - pivots;
+      //printf("[procID:%d buckedId:%d data:%f]\n",procId, bucketId, data[i]);
+      if(bucketId != procs - 1)
+	srcCount[bucketId] += 1;
+      else
+	srcCount[procs-1] += 1;
     }
   }
-  //last Pivot count and disp
-  srcCount[pivIndex] = count;
-  srcDispl[pivIndex] = displ;
 
-  //If we did not reach the end of the pivots set the remaining counts
-  //to 0 and the displacement to max displacement
-  while(pivIndex != procs-1){
-    pivIndex += 1;
-    srcCount[pivIndex] = 0;
-    srcDispl[pivIndex] = srcDispl[pivIndex-1];
+  srcDispl[0] = 0;
+  for(int i=1; i < procs; i++){
+    srcDispl[i] = srcDispl[i-1] + srcCount[i-1];
   }
 
 #ifdef DBG_2
@@ -254,13 +226,6 @@ void parallelSort(float *data, float *&sortedData, int procs,
   
   localSize = destDispl[procs-1] + destCount[procs-1];
 
-#ifdef DBG_3
-  textcolor(RED+procId);
-  printf("ProcId:%d Final_Local_Size:%d Fraction:%.3f%\n", procId, localSize,
-	 float(localSize)/float(dataSize)*100.0f);
-  textcolor(WHITE);
-#endif
-
   sortedData = (float*)malloc(sizeof(float)*localSize);
   
   //Exchange bucket data
@@ -271,6 +236,13 @@ void parallelSort(float *data, float *&sortedData, int procs,
   //Final Local Sort
   //NLOG(N)
   sort(sortedData, sortedData + localSize);
+
+#ifdef DBG_3
+  textcolor(RED+procId);
+  printf("ProcId:%d Final_Local_Size:%d Fraction:%.3f%\n", procId, localSize,
+	 float(localSize)/float(dataSize)*100.0f);
+  textcolor(WHITE);
+#endif
   return;
 }
 

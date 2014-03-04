@@ -61,16 +61,17 @@ int main(int argc, char **argv) {
   double serialTime = serialSort(data, procs, procId, dataSize, localSize);
   double mergeTime = mergeSort(data, procs, procId, dataSize, localSize);
 
-
+  assert( MPI_Barrier(MPI_COMM_WORLD) == MPI_SUCCESS );
   double startTime = MPI_Wtime();
-
+  
   sortedData = NULL;
   parallelSort(data, sortedData, procs, procId, dataSize, localSize);
 
+  assert( MPI_Barrier(MPI_COMM_WORLD) == MPI_SUCCESS );
   double endTime = MPI_Wtime();
 
   checkSort(sortedData, procs, procId, dataSize, localSize);
-  if (procId == 0) {
+  if (procId == 1) {
     printf("Serial sort\t\ttook %.4fs on %d processors\n",
         serialTime, 1);
     printf("Parallel merge sort\ttook %.4fs on %d processors\tSpeedup: %.4fx\n",
