@@ -159,23 +159,18 @@ void parallelSort(float *data, float *&sortedData, int procs,
 
     //Note that in the future this could be made an Asynchronous Recieve
     MPI_Recv(pivots, procs-1, MPI_FLOAT, ROOT, procId, MPI_COMM_WORLD, &stat);
-
-#ifdef DBG_1
-    textcolor(MAGENTA);
-    printf("ProcID:%d\n", procId);
-    printArr("Pivots:", pivots, procs-1, procId);
-    textcolor(WHITE);
-#endif    
   }
+
   double startTime = MPI_Wtime();
-
   //NLOG(N) sorting time
-  sort(data, data + localSize);
-
+  //sort(data, data + localSize);
+  
   //calculate a send count
   int* srcCount = (int*)calloc(procs,sizeof(int));
   int* srcDispl = (int*)calloc(procs,sizeof(int));
-  
+  int* tmpCount = (int*)calloc(procs,sizeof(int));
+  float* tmpData = (float*)malloc(sizeof(float)*localSize);
+
   //Use upper_bound to make this part cleaner
   int bucketId;
   for(int i=0; i < localSize; i++){
@@ -198,10 +193,38 @@ void parallelSort(float *data, float *&sortedData, int procs,
     srcDispl[i] = srcDispl[i-1] + srcCount[i-1];
   }
 
+  int index;
+  for(int i=0; i < localSize; i++){
+    if(data[i] < pivots[0]){
+      //printf("[procID:%d buckedId:%d data:%f]\n",procId, 0, data[i]);
+      index = srcDispl[0] + tmpCount[0];
+      tmpData[index] = data[i];
+      tmpCount[0]+=1;
+    }
+    else{
+      bucketId = upper_bound(pivots, pivots + procs-1, data[i]) - pivots;
+      //printf("[procID:%d buckedId:%d data:%f]\n",procId, bucketId, data[i]);
+      if(bucketId != procs - 1){
+	index = srcDispl[bucketId] + tmpCount[bucketId];
+	tmpData[index] = data[i];
+	tmpCount[bucketId] += 1;
+      }
+      else{
+	index = srcDispl[procs-1] + tmpCount[procs-1];
+	tmpData[index] = data[i];
+	tmpCount[procs-1] += 1;
+      }
+    }
+
+  }//end_for
+
   double endTime = MPI_Wtime();
 #ifdef DBG_TIME
+  //printArr("tmpData: ",tmpData, localSize, procId);
   printf("[Sort,src,displ Time: %.4f]\n",endTime-startTime);
 #endif
+  //localSize = 0;
+  //return;
 
 #ifdef DBG_2
   textcolor(RED+procId);
@@ -234,7 +257,7 @@ void parallelSort(float *data, float *&sortedData, int procs,
   sortedData = (float*)malloc(sizeof(float)*localSize);
   
   //Exchange bucket data
-  MPI_Alltoallv(data, srcCount, srcDispl, MPI_INT,
+  MPI_Alltoallv(tmpData, srcCount, srcDispl, MPI_INT,
 		sortedData, destCount, destDispl, MPI_INT,
 		MPI_COMM_WORLD);
 
