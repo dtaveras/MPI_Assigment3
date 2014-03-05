@@ -26,6 +26,7 @@
 
 #define LOG_10(X) (log(X))/(log(10))
 
+#define DBG_TIME
 #define DBG_3
 //#define DBG_1
 //#define DBG_2
@@ -124,6 +125,7 @@ void parallelSort(float *data, float *&sortedData, int procs,
   float* pivots;
   //Only Processor 0 is working now
   if(procId == ROOT){
+
 #ifdef DBG_1
     textcolor(YELLOW);
     printArr("Samples: ", randLocSamples, locSampleSize, procId);
@@ -148,6 +150,7 @@ void parallelSort(float *data, float *&sortedData, int procs,
     for(int i=1; i < procs; i++){
       MPI_Send(pivots, procs-1, MPI_FLOAT, i, i, MPI_COMM_WORLD);
     }
+
   }
   else{
     MPI_Status stat;
@@ -164,19 +167,16 @@ void parallelSort(float *data, float *&sortedData, int procs,
     textcolor(WHITE);
 #endif    
   }
-  
-  //By Now everyone has a copy of the pivots
-  //-1 Sort then get indices and send 
-  //First we need an all to all communication to indicate each other how many
-  //elements each will be receiving
+  double startTime = MPI_Wtime();
 
   //NLOG(N) sorting time
   sort(data, data + localSize);
+
   //calculate a send count
   int* srcCount = (int*)calloc(procs,sizeof(int));
   int* srcDispl = (int*)calloc(procs,sizeof(int));
   
-  //Use lower_bound to make this part cleaner
+  //Use upper_bound to make this part cleaner
   int bucketId;
   for(int i=0; i < localSize; i++){
     if(data[i] < pivots[0]){
@@ -197,6 +197,11 @@ void parallelSort(float *data, float *&sortedData, int procs,
   for(int i=1; i < procs; i++){
     srcDispl[i] = srcDispl[i-1] + srcCount[i-1];
   }
+
+  double endTime = MPI_Wtime();
+#ifdef DBG_TIME
+  printf("[Sort,src,displ Time: %.4f]\n",endTime-startTime);
+#endif
 
 #ifdef DBG_2
   textcolor(RED+procId);

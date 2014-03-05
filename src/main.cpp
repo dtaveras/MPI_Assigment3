@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
   double endTime = MPI_Wtime();
 
   checkSort(sortedData, procs, procId, dataSize, localSize);
-  if (procId == 1) {
+  if (procId == 0) {
     printf("Serial sort\t\ttook %.4fs on %d processors\n",
         serialTime, 1);
     printf("Parallel merge sort\ttook %.4fs on %d processors\tSpeedup: %.4fx\n",
